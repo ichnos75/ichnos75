@@ -1,100 +1,153 @@
+import sys
+import io
 import os
-import tkinter as tk
-from tkinter import filedialog, messagebox, ttk
-from pydub import AudioSegment
-from pydub.playback import play
+from PyQt5.QtWidgets import (QApplication, QMainWindow, QPushButton, QVBoxLayout, QWidget, QProgressBar, 
+                             QFileDialog, QLabel, QHBoxLayout, QSizePolicy, QListWidget, QListWidgetItem, QCheckBox)
+from PyQt5.QtMultimedia import QMediaPlayer, QMediaContent
+from PyQt5.QtCore import QUrl, Qt
+from PyQt5.QtGui import QFont
 from Crypto.Cipher import AES
 
-# AES Key (32 bytes for AES-256)
-AES_KEY = bytes([
-    0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07,
-    0x08, 0x09, 0x0A, 0x0B, 0x0C, 0x0D, 0x0E, 0x0F,
-    0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17,
-    0x18, 0x19, 0x1A, 0x1B, 0x1C, 0x1D, 0x1E, 0x1F
-])
+class AudioPlayer(QMainWindow):
+    def __init__(self):
+        super().__init__()
 
-# Initialization Vector (16 bytes)
-AES_IV = bytes([
-    0xA0, 0xB1, 0xC2, 0xD3, 0xE4, 0xF5, 0xA6, 0xB7,
-    0xC8, 0xD9, 0xE0, 0xF1, 0xA2, 0xB3, 0xC4, 0xD5
-])
+        self.setWindowTitle("Audio Player")
+        self.setGeometry(100, 100, 600, 400)
 
-def decrypt_file(input_file, output_file):
-    with open(input_file, 'rb') as f:
-        encrypted_data = f.read()
+        self.mediaPlayer = QMediaPlayer(None, QMediaPlayer.StreamPlayback)
+        self.initUI()
 
-    cipher = AES.new(AES_KEY, AES.MODE_CBC, AES_IV)
-    decrypted_data = cipher.decrypt(encrypted_data)
+    def initUI(self):
+        self.playButton = QPushButton("Play")
+        self.stopButton = QPushButton("Stop")
+        self.pauseButton = QPushButton("Pause")
+        self.nextButton = QPushButton("Next")
+        self.previousButton = QPushButton("Previous")
+        self.loadButton = QPushButton("Load File or Folder")
+        self.saveButton = QPushButton("Save Decrypted File")
+        self.fileList = QListWidget()
+        
+        self.fileNameLabel = QLabel("No file loaded")
+        self.fileNameLabel.setFont(QFont("Arial", 12))
+        self.fileNameLabel.setStyleSheet("background-color: lightgreen; border-radius: 10px; padding: 4px;")
+        self.fileNameLabel.setSizePolicy(QSizePolicy.Minimum, QSizePolicy.Minimum)
+        self.fileNameLabel.setAlignment(Qt.AlignCenter)
 
-    with open(output_file, 'wb') as f:
-        if len(decrypted_data) > 16:
-            f.write(decrypted_data[16:])
+        self.progressBar = QProgressBar(self)
+        self.progressBar.setGeometry(30, 40, 200, 25)
 
-def play_audio(file_path):
-    audio = AudioSegment.from_wav(file_path)
-    play(audio)
+        layout = QVBoxLayout()
+        layout.addWidget(self.progressBar)
+        layout.addWidget(self.playButton)
+        layout.addWidget(self.stopButton)
+        layout.addWidget(self.pauseButton)
+        layout.addWidget(self.nextButton)
+        layout.addWidget(self.previousButton)
+        layout.addWidget(self.loadButton)
+        layout.addWidget(self.saveButton)
+        layout.addWidget(self.fileList)
 
-def load_file():
-    file_path = filedialog.askopenfilename()
-    if file_path:
-        status_label.config(text=f"Selected File: {os.path.basename(file_path)}")
-        return file_path
-    return None
+        fileStatusLayout = QHBoxLayout()
+        fileStatusLayout.addWidget(self.fileNameLabel)
+        fileStatusLayout.setAlignment(Qt.AlignCenter)
+        layout.addLayout(fileStatusLayout)
 
-def save_file():
-    file_path = filedialog.asksaveasfilename(defaultextension=".wav", filetypes=[("WAV files", "*.wav")])
-    if file_path:
-        return file_path
-    return None
+        container = QWidget()
+        container.setLayout(layout)
+        self.setCentralWidget(container)
 
-def decrypt_and_save():
-    input_file = load_file()
-    if input_file:
-        output_file = save_file()
-        if output_file:
-            try:
-                decrypt_file(input_file, output_file)
-                status_label.config(text=f"Decryption successful! Saved to: {os.path.basename(output_file)}")
-            except Exception as e:
-                messagebox.showerror("Error", f"Decryption failed: {e}")
+        self.playButton.clicked.connect(self.playAudio)
+        self.stopButton.clicked.connect(self.stopAudio)
+        self.pauseButton.clicked.connect(self.pauseAudio)
+        self.nextButton.clicked.connect(self.nextAudio)
+        self.previousButton.clicked.connect(self.previousAudio)
+        self.loadButton.clicked.connect(self.loadFilesOrFolder)
+        self.saveButton.clicked.connect(self.saveDecryptedFile)
 
-def decrypt_and_play():
-    input_file = load_file()
-    if input_file:
-        try:
-            temp_file = "temp_decrypted.wav"
-            decrypt_file(input_file, temp_file)
-            play_audio(temp_file)
-            os.remove(temp_file)
-        except Exception as e:
-            messagebox.showerror("Error", f"Decryption or Playback failed: {e}")
+        self.decrypted_data = None
+        self.files = []
 
-app = tk.Tk()
-app.title("AES File Decryption")
-app.geometry("400x300")
+    def playAudio(self):
+        selected_items = self.fileList.selectedItems()
+        if selected_items:
+            self.decryptAndLoad(selected_items[0].text())
+            self.mediaPlayer.play()
 
-style = ttk.Style(app)
-style.configure("TButton", padding=6, relief="raised", background="#ccc", borderwidth=2)
-style.map("TButton", background=[("active", "#efefef")])
+    def stopAudio(self):
+        self.mediaPlayer.stop()
 
-load_btn = ttk.Button(app, text="Load Encrypted File", command=load_file)
-save_btn = ttk.Button(app, text="Decrypt and Save File", command=decrypt_and_save)
-play_btn = ttk.Button(app, text="Play", command=decrypt_and_play)
-pause_btn = ttk.Button(app, text="Pause", command=lambda: print("Pause not implemented"))
-stop_btn = ttk.Button(app, text="Stop", command=lambda: print("Stop not implemented"))
-forward_btn = ttk.Button(app, text="Forward", command=lambda: print("Forward not implemented"))
-backward_btn = ttk.Button(app, text="Backward", command=lambda: print("Backward not implemented"))
-status_label = ttk.Label(app, text="Status: Waiting for user input", wraplength=300)
-progress_bar = ttk.Scale(app, from_=0, to=100, orient="horizontal")
+    def pauseAudio(self):
+        self.mediaPlayer.pause()
 
-load_btn.pack(pady=5)
-save_btn.pack(pady=5)
-play_btn.pack(pady=5)
-pause_btn.pack(pady=5)
-stop_btn.pack(pady=5)
-forward_btn.pack(pady=5)
-backward_btn.pack(pady=5)
-status_label.pack(pady=5)
-progress_bar.pack(fill="x", padx=10, pady=10)
+    def nextAudio(self):
+        # Implement next audio logic
+        pass
 
-app.mainloop()
+    def previousAudio(self):
+        # Implement previous audio logic
+        pass
+
+    def loadFilesOrFolder(self):
+        options = QFileDialog.Options()
+        options |= QFileDialog.DontUseNativeDialog
+        fileDialog = QFileDialog()
+        fileDialog.setFileMode(QFileDialog.ExistingFiles)
+        fileDialog.setOptions(options)
+        fileDialog.setNameFilter("Audio Files (*.wav)")
+        fileDialog.setViewMode(QFileDialog.Detail)
+        if fileDialog.exec_():
+            files = fileDialog.selectedFiles()
+            if len(files) == 1 and os.path.isdir(files[0]):
+                files = [os.path.join(files[0], f) for f in os.listdir(files[0]) if f.endswith('.wav')]
+            self.files = files
+            self.fileList.clear()
+            for file in self.files:
+                item = QListWidgetItem(file)
+                checkbox = QCheckBox()
+                checkbox.stateChanged.connect(lambda state, f=file: self.onCheckboxStateChanged(state, f))
+                self.fileList.addItem(item)
+                self.fileList.setItemWidget(item, checkbox)
+
+    def onCheckboxStateChanged(self, state, file_path):
+        if state == Qt.Checked:
+            for i in range(self.fileList.count()):
+                item = self.fileList.item(i)
+                checkbox = self.fileList.itemWidget(item)
+                if checkbox and checkbox != self.sender():
+                    checkbox.setChecked(False)
+            self.decryptAndLoad(file_path)
+
+    def decryptAndLoad(self, file_path):
+        key = b'\x00\x01\x02\x03\x04\x05\x06\x07\x08\x09\x0A\x0B\x0C\x0D\x0E\x0F\x10\x11\x12\x13\x14\x15\x16\x17\x18\x19\x1A\x1B\x1C\x1D\x1E\x1F'
+        iv = b'\xA0\xB1\xC2\xD3\xE4\xF5\xA6\xB7\xC8\xD9\xE0\xF1\xA2\xB3\xC4\xD5'
+
+        cipher = AES.new(key, AES.MODE_CBC, iv)
+
+        with open(file_path, "rb") as encrypted_file:
+            encrypted_data = encrypted_file.read()
+            decrypted_data = cipher.decrypt(encrypted_data)
+
+            # Skip the first 32 bytes of the decrypted data
+            self.decrypted_data = decrypted_data[32:]
+
+            audio_data = io.BytesIO(self.decrypted_data)
+            audio_data.seek(0)
+
+            url = QUrl.fromLocalFile(file_path)
+            self.mediaPlayer.setMedia(QMediaContent(url))
+
+            self.fileNameLabel.setText(f"Loaded file: {os.path.basename(file_path)}")
+
+    def saveDecryptedFile(self):
+        if self.decrypted_data:
+            save_path, _ = QFileDialog.getSaveFileName(self, "Save Decrypted Audio File", "", "Audio Files (*.wav)")
+            if save_path:
+                with open(save_path, "wb") as audio_file:
+                    audio_file.write(self.decrypted_data)
+
+if __name__ == "__main__":
+    app = QApplication(sys.argv)
+    player = AudioPlayer()
+    player.show()
+    sys.exit(app.exec_())
