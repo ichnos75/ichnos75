@@ -1,7 +1,6 @@
 import os
-import struct
 import tkinter as tk
-from tkinter import filedialog, messagebox
+from tkinter import filedialog, messagebox, ttk
 from pydub import AudioSegment
 from pydub.playback import play
 from Crypto.Cipher import AES
@@ -72,16 +71,30 @@ def decrypt_and_play():
 
 app = tk.Tk()
 app.title("AES File Decryption")
-app.geometry("400x200")
+app.geometry("400x300")
 
-load_btn = tk.Button(app, text="Load Encrypted File", command=load_file)
-save_btn = tk.Button(app, text="Decrypt and Save File", command=decrypt_and_save)
-play_btn = tk.Button(app, text="Decrypt and Play File", command=decrypt_and_play)
-status_label = tk.Label(app, text="Status: Waiting for user input", wraplength=300)
+style = ttk.Style(app)
+style.configure("TButton", padding=6, relief="flat", background="#ccc")
+style.map("TButton", background=[("active", "#efefef")])
 
-load_btn.pack(pady=10)
-save_btn.pack(pady=10)
-play_btn.pack(pady=10)
-status_label.pack(pady=10)
+load_btn = ttk.Button(app, text="Load Encrypted File", command=load_file)
+save_btn = ttk.Button(app, text="Decrypt and Save File", command=decrypt_and_save)
+play_btn = ttk.Button(app, text="Play", command=decrypt_and_play)
+pause_btn = ttk.Button(app, text="Pause", command=lambda: print("Pause not implemented"))
+stop_btn = ttk.Button(app, text="Stop", command=lambda: print("Stop not implemented"))
+forward_btn = ttk.Button(app, text="Forward", command=lambda: print("Forward not implemented"))
+backward_btn = ttk.Button(app, text="Backward", command=lambda: print("Backward not implemented"))
+status_label = ttk.Label(app, text="Status: Waiting for user input", wraplength=300)
+progress_bar = ttk.Scale(app, from_=0, to=100, orient="horizontal")
+
+load_btn.pack(pady=5)
+save_btn.pack(pady=5)
+play_btn.pack(pady=5)
+pause_btn.pack(pady=5)
+stop_btn.pack(pady=5)
+forward_btn.pack(pady=5)
+backward_btn.pack(pady=5)
+status_label.pack(pady=5)
+progress_bar.pack(fill="x", padx=10, pady=10)
 
 app.mainloop()
