@@ -1,4 +1,4 @@
-# progetto dave
+import wave
 import sys
 import io
 import os
@@ -73,6 +73,14 @@ class AudioPlayer(QMainWindow):
         selected_items = self.fileList.selectedItems()
         if selected_items:
             self.decryptAndLoad(selected_items[0].text())
+            temp_file = "temp_decrypted.wav"
+            with wave.open(temp_file, 'wb') as f:
+                f.setnchannels(1)
+                f.setsampwidth(2)
+                f.setframerate(44100)
+                f.writeframes(self.decrypted_data)
+            url = QUrl.fromLocalFile(temp_file)
+            self.mediaPlayer.setMedia(QMediaContent(url))
             self.mediaPlayer.play()
 
     def stopAudio(self):
@@ -133,20 +141,21 @@ class AudioPlayer(QMainWindow):
             padding_len = decrypted_data[-1]
             self.decrypted_data = decrypted_data[:-padding_len]
 
-            audio_data = io.BytesIO(self.decrypted_data)
-            audio_data.seek(0)
-
-            url = QUrl.fromLocalFile(file_path)
-            self.mediaPlayer.setMedia(QMediaContent(url))
-
-            self.fileNameLabel.setText(f"Loaded file: {os.path.basename(file_path)}")
-
     def saveDecryptedFile(self):
-        if self.decrypted_data:
+        selected_items = self.fileList.selectedItems()
+        if selected_items:
+            self.decryptAndLoad(selected_items[0].text())
             save_path, _ = QFileDialog.getSaveFileName(self, "Save Decrypted Audio File", "", "Audio Files (*.wav)")
             if save_path:
-                with open(save_path, "wb") as audio_file:
-                    audio_file.write(self.decrypted_data)
+                # Assicurati che i dati decriptati siano in un formato WAV valido
+                with wave.open(save_path, 'wb') as audio_file:
+                    audio_file.setnchannels(1)  # Numero di canali, 1 per mono
+                    audio_file.setsampwidth(2)  # Larghezza del campione in byte, 2 per 16 bit
+                    audio_file.setframerate(44100)  # Frequenza di campionamento
+                    audio_file.writeframes(self.decrypted_data)
+                print(f"File salvato correttamente in {save_path}")
+            else:
+                print("Salvataggio annullato")
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
