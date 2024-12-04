@@ -74,7 +74,7 @@ app.title("AES File Decryption")
 app.geometry("400x300")
 
 style = ttk.Style(app)
-style.configure("TButton", padding=6, relief="flat", background="#ccc")
+style.configure("TButton", padding=6, relief="raised", background="#ccc", borderwidth=2)
 style.map("TButton", background=[("active", "#efefef")])
 
 load_btn = ttk.Button(app, text="Load Encrypted File", command=load_file)
