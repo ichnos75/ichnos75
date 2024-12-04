@@ -1,3 +1,4 @@
+# progetto dave
 import sys
 import io
 import os
@@ -128,8 +129,9 @@ class AudioPlayer(QMainWindow):
             encrypted_data = encrypted_file.read()
             decrypted_data = cipher.decrypt(encrypted_data)
 
-            # Skip the first 32 bytes of the decrypted data
-            self.decrypted_data = decrypted_data[32:]
+            # Remove PKCS7 padding
+            padding_len = decrypted_data[-1]
+            self.decrypted_data = decrypted_data[:-padding_len]
 
             audio_data = io.BytesIO(self.decrypted_data)
             audio_data.seek(0)
